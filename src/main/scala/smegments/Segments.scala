@@ -3,6 +3,7 @@ package smegments
 import java.net.URL
 
 import com.google.code.tempusfugit.temporal.Duration.minutes
+import io.circe.{Decoder, HCursor}
 import io.circe.generic.auto._
 import io.circe.parser._
 import org.apache.http.client.utils.URIBuilder
@@ -13,7 +14,9 @@ import simplehttp.configuration.HttpTimeout.httpTimeout
 import simplehttp.configuration.OAuthCredentials.oAuth
 
 case class BoundCoords(lat: Double, lon: Double)
-case class Segment(id: Int, name: String, avg_grade: Double, distance: Double)
+
+case class Segment(id: Int, name: String, resourceState: ResourceState, averageGrade: Double, distance: Double)
+
 case class Segments(segments: List[Segment])
 
 object Segments {
@@ -30,10 +33,15 @@ object Segments {
       .addParameter("activity_type", "running")
       .build().toURL
 
-    val response = client.get(
-      url, headers()
-    )
+    implicit val decodeFoo: Decoder[Segment] = (c: HCursor) => for {
+      id <- c.downField("id").as[Int]
+      name <- c.downField("name").as[String]
+      resourceStateId <- c.downField("resource_state").as[Int]
+      averageGrade <- c.downField("avg_grade").as[Double]
+      distance <- c.downField("distance").as[Double]
+    } yield Segment(id, name, ResourceState(resourceStateId), averageGrade, distance)
 
+    val response = client.get(url, headers())
 
     if (response.ok()) {
       decode[Segments](response.getContent.asString()).left.map(error => JsonParseError(error.getMessage))

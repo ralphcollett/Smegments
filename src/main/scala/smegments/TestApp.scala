@@ -8,5 +8,8 @@ object TestApp extends App {
 
   val royalVictoriaDock = BoundCoords(51.508270, 0.018356)
 
-  println(Segments.find(brockwellPark, royalVictoriaDock, accessTokenString))
+  val segments = Segments.find(brockwellPark, royalVictoriaDock, accessTokenString)
+  segments.fold(println, {
+    _.segments.foreach(println)
+  })
 }
