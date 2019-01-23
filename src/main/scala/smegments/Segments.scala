@@ -15,7 +15,7 @@ import simplehttp.configuration.OAuthCredentials.oAuth
 
 case class BoundCoords(lat: Double, lon: Double)
 
-case class Segment(id: Int, name: String, resourceState: ResourceState, averageGrade: Double, distance: Double)
+case class Segment(id: Int, resourceState: ResourceState, name: String, climbCategory: Int, climbCategoryDesc: String, averageGrade: Double, startLatLong: BoundCoords, endLatLon: BoundCoords, elev_difference: Double, distance: Double, points: String, starred: Boolean)
 
 case class Segments(segments: List[Segment])
 
@@ -35,11 +35,20 @@ object Segments {
 
     implicit val decodeFoo: Decoder[Segment] = (c: HCursor) => for {
       id <- c.downField("id").as[Int]
-      name <- c.downField("name").as[String]
       resourceStateId <- c.downField("resource_state").as[Int]
+      name <- c.downField("name").as[String]
+      climbCategory <- c.downField("climb_category").as[Int]
+      climbCategoryDesc <- c.downField("climb_category_desc").as[String]
+      startLatLong <- c.downField("start_latlng").as[Array[Double]]
+      endLatLong <- c.downField("end_latlng").as[Array[Double]]
       averageGrade <- c.downField("avg_grade").as[Double]
+      elevDifference <- c.downField("elev_difference").as[Double]
       distance <- c.downField("distance").as[Double]
-    } yield Segment(id, name, ResourceState(resourceStateId), averageGrade, distance)
+      points <- c.downField("points").as[String]
+      starred <- c.downField("starred").as[Boolean]
+    } yield Segment(id, ResourceState(resourceStateId), name, climbCategory, climbCategoryDesc, averageGrade,
+      BoundCoords(startLatLong(0), startLatLong(1)), BoundCoords(endLatLong(0), endLatLong(1)), elevDifference,
+      distance, points, starred)
 
     val response = client.get(url, headers())
 
