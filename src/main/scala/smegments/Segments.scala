@@ -13,23 +13,42 @@ import simplehttp.configuration.AccessToken.accessToken
 import simplehttp.configuration.HttpTimeout.httpTimeout
 import simplehttp.configuration.OAuthCredentials.oAuth
 
-case class BoundCoords(lat: Double, lon: Double)
+case class BoundCoords(latitude: Double, longitude: Double)
 
 case class Segment(id: Int, resourceState: ResourceState, name: String, climbCategory: Int, climbCategoryDesc: String, averageGrade: Double, startLatLong: BoundCoords, endLatLon: BoundCoords, elev_difference: Double, distance: Double, points: String, starred: Boolean)
 
-case class Segments(segments: List[Segment])
+case class Segments(segments: Set[Segment]) {
+  def merge(other: Segments): Segments = {
+    Segments(segments | other.segments)
+  }
+}
 
 object Segments {
+
+  def findMore(southWest: BoundCoords, northEast: BoundCoords, accessTokenString: String, depth: Int = 1): Either[Error, Segments] = {
+    if (depth > 3) return Right(Segments(Set.empty))
+    val longitudeMiddle = (northEast.longitude + southWest.longitude) / 2
+    val latitudeMiddle = (southWest.latitude + northEast.latitude) / 2
+
+    val segments = find(southWest, northEast, accessTokenString)
+    List(
+      (southWest, BoundCoords(latitudeMiddle, longitudeMiddle)),
+      (BoundCoords(southWest.latitude, longitudeMiddle), BoundCoords(southWest.latitude, northEast.longitude)),
+      (BoundCoords(latitudeMiddle, southWest.longitude), BoundCoords(northEast.longitude, longitudeMiddle)),
+      (BoundCoords(latitudeMiddle, longitudeMiddle), northEast)
+    ).map(coords => findMore(coords._1, coords._2, accessTokenString, depth + 1))
+      .foldLeft(segments)((accumulatedSegments, searchResults) => accumulatedSegments.flatMap(s => searchResults.map(_.merge(s))))
+  }
 
   def find(southWest: BoundCoords, northEast: BoundCoords, accessTokenString: String): Either[Error, Segments] = {
     val credentials = oAuth(accessToken(accessTokenString), new URL("https://www.strava.com/api"))
 
     val client = anApacheClient().`with`(credentials).`with`(httpTimeout(minutes(1)))
     val url = new URIBuilder("https://www.strava.com/api/v3/segments/explore")
-      .addParameter("bounds", s"${southWest.lat}," +
-        s"${southWest.lon}," +
-        s"${northEast.lat}," +
-        s"${northEast.lon}")
+      .addParameter("bounds", s"${southWest.latitude}," +
+        s"${southWest.longitude}," +
+        s"${northEast.latitude}," +
+        s"${northEast.longitude}")
       .addParameter("activity_type", "running")
       .build().toURL
 
